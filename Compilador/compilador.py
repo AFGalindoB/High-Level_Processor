@@ -29,18 +29,26 @@ class Compilador:
         self.memory_configuration = self.set_configuration()
         print("Bienvenido al compilador de instrucciones.")
         
-        TARGET_BITS = 42
         while True:
-            load = self.get_option("load")
-            bus = self.get_option("bus")
-            data = self.get_data()
-            instruction = load + bus + data
+            input_type = input("Desea compilar una instruccion o imprimir una palabra? (instruccion/palabra): ").lower()
+            if input_type == "palabra":
+                self.print_hardware()
+            else:
+                load = self.get_option("load")
+                bus = self.get_option("bus")
+                data = self.get_data()
+                instruction = load + bus + data
             
-            instruction_hex = hex(int(instruction, 2))[2:].upper().zfill((TARGET_BITS + 3) // 4)
-            print(f"Instruccion compilada: {instruction_hex}")
-            self.write_memory(instruction_hex)
+                instruction_hex = self.convert_instruction_to_hex(instruction)
+                print(f"Instruccion compilada: {instruction_hex}")
+                self.write_memory(instruction_hex)
             opcion = input("Desea compilar otra instruccion? (s/n): ").lower()
             if opcion == 'n': break
+
+    def convert_instruction_to_hex(self, instruction):
+        TARGET_BITS = 42
+        instruction_hex = hex(int(instruction, 2))[2:].upper().zfill((TARGET_BITS + 3) // 4)
+        return instruction_hex
 
     def write_memory(self, instruction):
         memory_path = os.path.join(self.root_path, "ROM.txt")
@@ -63,6 +71,33 @@ class Compilador:
                 return data_binary
             else:
                 print("Instruccion invalida, intente de nuevo.")
+    
+    def print_hardware(self):    
+        palabra = []
+        BUS = "1001"  # CU
+        LOAD1 = "101001"  # GPU_INSTRUCTION_ADDRESS
+        LOAD2 = "010111"  # GPU_INSTRUCTIONS
+        letras = {" ":"0000000", "A":"0000001", "B":"0000010", "C":"0000011", "D":"0000100", "E":"0000101", 
+                    "F":"0000110", "G":"0000111", "H":"0001000", "I":"0001001", "J":"0001010", "K":"0001011", 
+                    "L":"0001100", "M":"0001101", "N":"0001110", "Ñ":"0001111", "O":"0010000", "P":"0010001", 
+                    "Q":"0010010", "R":"0010011", "S":"0010100", "T":"0010101", "U":"0010110", "V":"0010111", 
+                    "W":"0011000", "X":"0011001", "Y":"0011010", "Z":"0011011"}
+        entrada = input("Ingrese la palabra a imprimir: ").upper()
+        for char in entrada:
+            if char in letras:
+                palabra.append(letras[char])
+                print(f"Caracter {char} agregado.")
+            else:
+                print(f"Caracter {char} no valido, se omite.")
+        print("Palabra completa en binario:", palabra)
+
+        for i in range(len(palabra)):
+            data = bin(i)[2:].zfill(32)
+            instruction = LOAD1 + BUS + data
+            self.write_memory(self.convert_instruction_to_hex(instruction))
+            letra = palabra[i].zfill(32)
+            instruction = LOAD2 + BUS + letra
+            self.write_memory(self.convert_instruction_to_hex(instruction))
     
     def get_option(self, options_type):
         if options_type == "bus":
