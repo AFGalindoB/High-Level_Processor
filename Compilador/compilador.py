@@ -4,20 +4,19 @@ import Funciones_Compilador.Values_Converter as converter
 class Compilador:
     def __init__(self):
         self.BUS_OPTIONS = {
-            "ALU_RESULT": "0000",
-            "R0":         "0001", "R1":   "0010", "R2": "00011", "R3": "0100",
-            "R4":         "0101", "R5":   "0110", "R6": "00111", "R7": "1000",
-            "CU":         "1001"
+            "ALU_R": "0000",
+            "R0":    "0001", "R1":   "0010", "R2": "00011", "R3": "0100",
+            "R4":    "0101", "R5":   "0110", "R6": "00111", "R7": "1000",
+            "CU":    "1001"
         }
         self.LOAD_OPTIONS = {
-            "ALU_X":               "00000", "ALU_Y":          "00001", "ALU_R":            "00010",
-            "R0":                  "00011", "R1":             "00100", "R2":               "00101",
-            "R3":                  "00110", "R4":             "00111", "R5":               "01000", 
-            "R6":                  "01001", "R7":             "01010", "GPU_INST":         "01011",
-            "IF-WH_CONDITION":     "01100", "IF-WH_START":    "01101", "IF-WH_END":        "01110",
-            "PC_JM_DTA":           "01111", "IN_STACK":       "10000", "PC_JUMP":          "10001",
-            "ALU_OP":              "10010", "PC_JM_OP":     "10011", "GPU_INST_ADRS":    "10100",
-            "STAC_ADDRESS":        "10101"
+            "ALU_X":          "00000", "ALU_Y":          "00001", "R0":               "00010",
+            "R1":             "00011", "R2":             "00100", "R3":               "00101",
+            "R4":             "00110", "R5":             "00111", "R6":               "01000", 
+            "R7":             "01001", "GPU_INST":       "01010", "IF-WH_CONDITION":  "01011",
+            "IF-WH_START":    "01100", "IF-WH_END":      "01101", "STAC_PC":          "01110",
+            "PC":             "01111", "ALU_OP":         "10000", "PC_JM_OP":         "10001",
+            "GPU_INST_ADR":   "10010", "STAC_PC_ADR":    "10011"
         }
         self.ALU_OP = {
             "ADD":"0000", "SUB": "0001", "MUL":"0010", "DIV":"0011",
@@ -113,11 +112,10 @@ class Compilador:
         self.write_in_ROM(instruction_hex)
 
     def alu_operation(self):
-        BUS = "1001" # CU
-        LOAD1 = "000001" # ALU_X
-        LOAD2 = "000011" # ALU_Y
-        LOAD3 = "100101" # ALU_OP
-        LOAD4 = "000101" # ALU_R
+        BUS = self.BUS_OPTIONS["CU"]
+        LOAD1 = self.LOAD_OPTIONS["ALU_X"] + "1"
+        LOAD2 = self.LOAD_OPTIONS["ALU_Y"] + "1"
+        LOAD3 = self.LOAD_OPTIONS["ALU_OP"] + "1"
 
         opciones = ["Enteros", "Decimales", "Logicos"]
         tipo_de_dato = self.select_option(opciones, "Seleccione el tipo de dato a operar:")
@@ -153,20 +151,21 @@ class Compilador:
         alu_op_bin = self.ALU_OP[operacion].zfill(32)
         print(f"{operacion} {x_bin} {y_bin}")
         
-        instruction = LOAD1 + BUS + x_bin
-        self.write_in_ROM(converter.convert_bin_to_hex(instruction, 42))
-        instruction = LOAD2 + BUS + y_bin
-        self.write_in_ROM(converter.convert_bin_to_hex(instruction, 42))
-        instruction = LOAD3 + BUS + alu_op_bin
-        self.write_in_ROM(converter.convert_bin_to_hex(instruction, 42))
-        instruction = LOAD4 + BUS + "0"*32
-        self.write_in_ROM(converter.convert_bin_to_hex(instruction, 42))
+        instruction = converter.convert_bin_to_hex(LOAD1 + BUS + x_bin, 42)
+        print(LOAD1 + BUS + x_bin, instruction, sep="\n")
+        self.write_in_ROM(instruction)
+        instruction = converter.convert_bin_to_hex(LOAD2 + BUS + y_bin, 42)
+        print(LOAD2 + BUS + y_bin, instruction, sep="\n")
+        self.write_in_ROM(instruction)
+        instruction = converter.convert_bin_to_hex(LOAD3 + BUS + alu_op_bin, 42)
+        print(LOAD3 + BUS + alu_op_bin, instruction, sep="\n")
+        self.write_in_ROM(instruction)
 
     def print_hardware(self):    
         palabra = []
-        BUS = "1001"  # CU
-        LOAD1 = "101001"  # GPU_INSTRUCTION_ADDRESS
-        LOAD2 = "010111"  # GPU_INSTRUCTIONS
+        BUS = self.BUS_OPTIONS["CU"]
+        LOAD1 = self.LOAD_OPTIONS["GPU_INST_ADR"] + "1" # GPU_INSTRUCTION_ADDRESS
+        LOAD2 = self.LOAD_OPTIONS["GPU_INST"] + "1" # GPU_INSTRUCTIONS
         letras = {" ":"0000000", "A":"0000001", "B":"0000010", "C":"0000011", "D":"0000100", "E":"0000101", 
                   "F":"0000110", "G":"0000111", "H":"0001000", "I":"0001001", "J":"0001010", "K":"0001011", 
                   "L":"0001100", "M":"0001101", "N":"0001110", "Ñ":"0001111", "O":"0010000", "P":"0010001", 
