@@ -1,22 +1,24 @@
 import os
 import Funciones_Compilador.Values_Converter as converter
+import Funciones_Compilador.Menu_User_Functions as menu
+import Funciones_Compilador.Validators as validators
 
 class Compilador:
     def __init__(self):
+        self.Length_Data = 48  # bits
+        self.Len_Instruction = 56  # bits
+        self.Screen_Resolution = (256, 256)  # pixels
         self.BUS_OPTIONS = {
-            "ALU_R": "0000",
-            "R0":    "0001", "R1":   "0010", "R2": "00011", "R3": "0100",
-            "R4":    "0101", "R5":   "0110", "R6": "00111", "R7": "1000",
-            "CU":    "1001"
+            "ALU_R": "000",
+            "R0":    "001", "R1":       "010", "R2":   "011", "R3": "100",
+            "CU":    "101", "VAR_CACHE":"110", "INPUT":"111"
         }
         self.LOAD_OPTIONS = {
-            "ALU_X":          "00000", "ALU_Y":          "00001", "R0":               "00010",
-            "R1":             "00011", "R2":             "00100", "R3":               "00101",
-            "R4":             "00110", "R5":             "00111", "R6":               "01000", 
-            "R7":             "01001", "GPU_INST":       "01010", "IF-WH_CONDITION":  "01011",
-            "IF-WH_START":    "01100", "IF-WH_END":      "01101", "STAC_PC":          "01110",
-            "PC":             "01111", "ALU_OP":         "10000", "PC_JM_OP":         "10001",
-            "GPU_INST_ADR":   "10010", "STAC_PC_ADR":    "10011"
+            "NOP":            "00000", "ALU_X":          "00001", "ALU_Y":            "00010",
+            "R0":             "00011", "R1":             "00100", "R2":               "00101",
+            "R3":             "00110", "IF_WH_CONDITION":"00111", "IF_WH_ADR":        "01000", 
+            "CACHE_PC":       "01001", "PC":             "01010", "ALU_OP":           "01011",
+            "PC_JM_OP":       "01100", "GPU_INST":       "01101"
         }
         self.ALU_OP = {
             "ADD":"0000", "SUB": "0001", "MUL":"0010", "DIV":"0011",
@@ -30,18 +32,17 @@ class Compilador:
         print("Bienvenido al compilador de instrucciones.")
         
         while True:
-            opciones = ["Compilar instruccion", "Operar con ALU", "Imprimir palabra en hardware"]
-            eleccion = self.select_option(opciones, "¿Que desea hacer?")
+            opciones = ["Compilar instruccion", "Operar con ALU", "Imprimir recurso"]
+            eleccion = menu.select_option(opciones, "¿Que desea hacer?")
 
-            if eleccion == "Imprimir palabra en hardware":
-                self.print_hardware()
+            if eleccion == "Imprimir recurso":
+                self.instruction_to_GPU()
             elif eleccion == "Operar con ALU":
                 self.alu_operation()
             else:
                 self.compile_instruction()
-            
-            opcion = input("Desea compilar otra instruccion? (s/n): ").lower()
-            if opcion == 'n': break
+
+            if not menu.accept("Desea compilar otra instruccion?"): break
 
     def set_configuration(self):
         memory_path = os.path.join(self.root_path, "ROM.txt")
@@ -55,80 +56,50 @@ class Compilador:
         with open(memory_path, "a") as f:
             f.write(instruction + "\n")
 
-    def select_option(self, options:list, text:str):
-        """Muestra un menu de opciones y devuelve el valor seleccionado de la lista. (NO el indice)"""
-        while True:
-            print(text)
-            for i, option in enumerate(options, 1):
-                print(f"{i}. {option}")
-            try:
-                eleccion = int(input("Ingrese el numero de la opcion: "))
-                if 1 <= eleccion <= len(options):
-                    return options[eleccion - 1]
-                else:
-                    print("Opcion invalida, intente de nuevo.")
-            except ValueError:
-                print("Entrada invalida. Por favor ingrese un numero.")
-
-    def accept(self, text):
-        while True:
-            respuesta = input(f"{text} (s/n): ").lower()
-            if respuesta == 's' or respuesta == 'n':
-                return respuesta
-            else:
-                print("Respuesta invalida. Por favor ingrese 's' para si o 'n' para no.")
-
-    def check_only_binary(self, value:str):
-        if not all(ch in '01' for ch in value):
-            raise ValueError("Entrada invalida: solo se admiten 0 y 1 en el input.")
-        else:
-            return value
-
-    def check_only_hexadecimal(self, value:str):
-        hex_digits = set("0123456789abcdefABCDEF")
-        if not all(ch in hex_digits for ch in value):
-            raise ValueError("Entrada invalida: solo se admiten digitos hexadecimales en el input.")
-        else:
-            return value
-
     def compile_instruction(self):
         load = self.get_option("load")
         bus = self.get_option("bus")
         while True :
             try:
-                data = self.check_only_hexadecimal(input("Ingrese la instruccion de 32 bits en hexadecimal: "))
-                if len(data) > 8:
-                    raise ValueError("Error: La instruccion no puede exceder los 32 bits.")
+                data = validators.check_only_hexadecimal(input(f"Ingrese la instruccion de {self.Length_Data} bits en hexadecimal: "))
+                if len(data) > self.Length_Data // 4:
+                    raise ValueError(f"Error: La instruccion no puede exceder los {self.Length_Data} bits.")
                 else:
-                    data = converter.convert_hex_to_bin(data, 32)
+                    data = converter.convert_hex_to_bin(data, self.Length_Data)
                     break
             except ValueError as ve:
                 print(ve)
                 
         instruction = load + bus + data
     
-        instruction_hex = converter.convert_bin_to_hex(instruction, 42)
+        instruction_hex = converter.convert_bin_to_hex(instruction, self.Len_Instruction)
         print(f"Instruccion compilada: {instruction_hex}")
         self.write_in_ROM(instruction_hex)
 
     def alu_operation(self):
         BUS = self.BUS_OPTIONS["CU"]
-        LOAD1 = self.LOAD_OPTIONS["ALU_X"] + "1"
-        LOAD2 = self.LOAD_OPTIONS["ALU_Y"] + "1"
-        LOAD3 = self.LOAD_OPTIONS["ALU_OP"] + "1"
+        LOAD1 = self.LOAD_OPTIONS["ALU_X"]
+        LOAD2 = self.LOAD_OPTIONS["ALU_Y"]
+        LOAD3 = self.LOAD_OPTIONS["ALU_OP"]
 
         opciones = ["Enteros", "Decimales", "Logicos"]
-        tipo_de_dato = self.select_option(opciones, "Seleccione el tipo de dato a operar:")
+        tipo_de_dato = menu.select_option(opciones, "Seleccione el tipo de dato a operar:")
 
         if tipo_de_dato == "Enteros":
             while True:
                 try:
-                    x_bin = int(input("Ingrese el valor entero de x (Min. 0, Max. 4.294.967.295): "))
-                    y_bin = int(input("Ingrese el valor entero de y (Min. 0, Max. 4.294.967.295): "))
-                    if not (0 <= x_bin <= 4294967295) or not (0 <= y_bin <= 4294967295):
-                        raise ValueError("Error: Los valores enteros deben estar entre 0 y 4.294.967.295.")
-                    x_bin = converter.convert_int_to_bin(x_bin, 32)
-                    y_bin = converter.convert_int_to_bin(y_bin, 32)
+                    max_value = (1 << self.Length_Data) - 1
+
+                    x_bin = int(input(f"Ingrese el valor entero de x (Min. 0, Max. {max_value}): "))
+                    y_bin = int(input(f"Ingrese el valor entero de y (Min. 0, Max. {max_value}): "))
+
+                    if not (0 <= x_bin <= max_value):
+                        raise ValueError(f"Error: x debe estar entre 0 y {max_value}.")
+                    if not (0 <= y_bin <= max_value):
+                        raise ValueError(f"Error: y debe estar entre 0 y {max_value}.")
+
+                    x_bin = converter.convert_int_to_bin(x_bin, self.Length_Data)
+                    y_bin = converter.convert_int_to_bin(y_bin, self.Length_Data)
                     break
                 except ValueError as ve:
                     print(ve)
@@ -137,68 +108,33 @@ class Compilador:
         elif tipo_de_dato == "Logicos":
             while True:
                 try:
-                    x_bin = self.check_only_hexadecimal(input("Ingrese el valor logico de x (en hexadecimal) (Max. 8 digitos): "))
-                    y_bin = self.check_only_hexadecimal(input("Ingrese el valor logico de y (en hexadecimal) (Max. 8 digitos): "))
-                    if len(x_bin) > 8 or len(y_bin) > 8:
-                        raise ValueError("Error: Los valores logicos no pueden exceder los 32 bits.")
-                    x_bin = converter.convert_hex_to_bin(x_bin, 32)
-                    y_bin = converter.convert_hex_to_bin(y_bin, 32)
+                    x_bin = validators.check_only_hexadecimal(input(f"Ingrese el valor logico de x (en hexadecimal) (Max. {self.Length_Data // 4} digitos): "))
+                    y_bin = validators.check_only_hexadecimal(input(f"Ingrese el valor logico de y (en hexadecimal) (Max. {self.Length_Data // 4} digitos): "))
+
+                    if len(x_bin) > self.Length_Data // 4 or len(y_bin) > self.Length_Data // 4:
+                        raise ValueError(f"Error: Los valores logicos no pueden exceder los {self.Length_Data} bits.")
+                    
+                    x_bin = converter.convert_hex_to_bin(x_bin, self.Length_Data)
+                    y_bin = converter.convert_hex_to_bin(y_bin, self.Length_Data)
                     break
                 except ValueError as ve:
                     print(ve)
             
-        operacion = self.select_option(list(self.ALU_OP.keys()), "Seleccione la operacion a realizar:")
-        alu_op_bin = self.ALU_OP[operacion].zfill(32)
+        operacion = menu.select_option(list(self.ALU_OP.keys()), "Seleccione la operacion a realizar:")
+        alu_op_bin = self.ALU_OP[operacion].zfill(self.Length_Data)
         print(f"{operacion} {x_bin} {y_bin}")
         
-        instruction = converter.convert_bin_to_hex(LOAD1 + BUS + x_bin, 42)
+        instruction = converter.convert_bin_to_hex(LOAD1 + BUS + x_bin, self.Len_Instruction)
         print(LOAD1 + BUS + x_bin, instruction, sep="\n")
         self.write_in_ROM(instruction)
-        instruction = converter.convert_bin_to_hex(LOAD2 + BUS + y_bin, 42)
+        
+        instruction = converter.convert_bin_to_hex(LOAD2 + BUS + y_bin, self.Len_Instruction)
         print(LOAD2 + BUS + y_bin, instruction, sep="\n")
         self.write_in_ROM(instruction)
-        instruction = converter.convert_bin_to_hex(LOAD3 + BUS + alu_op_bin, 42)
+        
+        instruction = converter.convert_bin_to_hex(LOAD3 + BUS + alu_op_bin, self.Len_Instruction)
         print(LOAD3 + BUS + alu_op_bin, instruction, sep="\n")
         self.write_in_ROM(instruction)
-
-    def print_hardware(self):    
-        palabra = []
-        BUS = self.BUS_OPTIONS["CU"]
-        LOAD1 = self.LOAD_OPTIONS["GPU_INST_ADR"] + "1" # GPU_INSTRUCTION_ADDRESS
-        LOAD2 = self.LOAD_OPTIONS["GPU_INST"] + "1" # GPU_INSTRUCTIONS
-        letras = {" ":"0000000", "A":"0000001", "B":"0000010", "C":"0000011", "D":"0000100", "E":"0000101", 
-                  "F":"0000110", "G":"0000111", "H":"0001000", "I":"0001001", "J":"0001010", "K":"0001011", 
-                  "L":"0001100", "M":"0001101", "N":"0001110", "Ñ":"0001111", "O":"0010000", "P":"0010001", 
-                  "Q":"0010010", "R":"0010011", "S":"0010100", "T":"0010101", "U":"0010110", "V":"0010111", 
-                  "W":"0011000", "X":"0011001", "Y":"0011010", "Z":"0011011", "a":"0011100", "b":"0011101", 
-                  "c":"0011110", "d":"0011111", "e":"0100000", "f":"0100001", "g":"0100010", "h":"0100011", 
-                  "i":"0100100", "j":"0100101", "k":"0100110", "l":"0100111", "m":"0101000", "n":"0101001",
-                  "ñ":"0101010", "o":"0101011", "p":"0101100", "q":"0101101", "r":"0101110", "s":"0101111",
-                  "t":"0110000", "u":"0110001", "v":"0110010", "w":"0110011", "x":"0110100", "y":"0110101", 
-                  "z":"0110110", "1":"0110111", "2":"0111000", "3":"0111001", "4":"0111010", "5":"0111011",
-                  "6":"0111100", "7":"0111101", "8":"0111110", "9":"0111111", "0":"1000000", "+":"1000001",
-                  "-":"1000010", "*":"1000011", "/":"1000100", ".":"1000101", ",":"1000110", ":":"1000111",
-                  ";":"1001000", "!":"1001001", "¡":"1001010", "?":"1001011", "¿":"1001100", '"':'1001101',
-                  "'":"1001110", "#":"1001111", "$":"1010000", "=":"1010001", "<":"1010010", ">":"1010011",
-                  "(":"1010100", ")":"1010101", "[":"1010110", "]":"1010111", "%":"1011000", "°":"1011001",
-                  "_":"1011010", "~":"1011011", "@":"1011100", "{":"1011101", "}":"1011110", "^":"1011111",
-                 "\\":"1100000", "&":"1100001", "|":"1100010"}
-        
-        entrada = input("Ingrese la palabra a imprimir: ")
-        for char in entrada:
-            if char in letras:
-                palabra.append(letras[char])
-                print(f"Caracter {char} agregado.")
-            else:
-                print(f"Caracter {char} no valido, se omite.")
-
-        for i in range(len(palabra)):
-            data = bin(i)[2:].zfill(32)
-            instruction = LOAD1 + BUS + data
-            self.write_in_ROM(converter.convert_bin_to_hex(instruction, 42))
-            letra = palabra[i].zfill(32)
-            instruction = LOAD2 + BUS + letra
-            self.write_in_ROM(converter.convert_bin_to_hex(instruction, 42))
     
     def get_option(self, options_type):
         """
@@ -210,13 +146,33 @@ class Compilador:
         opciones = self.BUS_OPTIONS if options_type == "bus" else self.LOAD_OPTIONS
         options_keys = list(opciones.keys())
         
-        while True:
-            option = self.select_option(options_keys, f"Seleccione una opcion de {options_type}:")
-            if options_type == "load":
-                carga = "1" if self.accept("Desea cargar el valor?") == 's' else "0"
-                return opciones[option] + carga
-            else:
-                return opciones[option]
+        option = menu.select_option(options_keys, f"Seleccione una opcion de {options_type}:")        
+        return opciones[option]
+
+    def instruction_to_GPU(self):
+        BUS = self.BUS_OPTIONS["CU"]
+        LOAD = self.LOAD_OPTIONS["GPU_INST"]
+
+        try:
+            op = "00" # Operacion de carga de recurso a frambuffer
+            x = int(input(f"Ingrese la coordenada X donde se colocara el recurso en pantalla (0-{self.Screen_Resolution[0] - 1}): "))
+            y = int(input(f"Ingrese la coordenada Y donde se colocara el recurso en pantalla (0-{self.Screen_Resolution[1] - 1}): "))
+            w = int(input("Ingrese el ancho del recurso (0-7 pixeles): "))
+            h = int(input("Ingrese el alto del recurso (0-7 pixeles): "))
+            dir_resource = int(input("Ingrese la posicion del recurso (en decimal):" )) * 64  # cada recurso ocupa 64 pixeles (8x8)
+        except ValueError:
+            print("Error: Entrada invalida. Asegurese de ingresar numeros enteros.")
+            return
+
+        coordenadas_bin = converter.convert_int_to_bin(x, 8) + converter.convert_int_to_bin(y, 8)
+        dimension_bin = converter.convert_int_to_bin(w, 3) + converter.convert_int_to_bin(h, 3)
+        dir_bin = converter.convert_int_to_bin(dir_resource, 24)
+        print(converter.convert_bin_to_hex(dir_bin, 24))
+        raise NotImplementedError("Carga de recursos a GPU no implementada completamente.")
+        instruction_bin = LOAD + BUS + dir_bin + dimension_bin + coordenadas_bin + op
+        instruction_hex = converter.convert_bin_to_hex(instruction_bin, self.Len_Instruction)
+        print(f"Instruccion para GPU: {instruction_hex}")
+        self.write_in_ROM(instruction_hex)
 
 if __name__ == "__main__":
     Compilador()
