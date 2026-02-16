@@ -149,26 +149,22 @@ class Compilador:
         return opciones[option]
 
     def instruction_to_GPU(self):
-        BUS = self.BUS_OPTIONS["CU"]
+        BUS = self.BUS_OPTIONS["IR"]
         LOAD = self.LOAD_OPTIONS["GPU_INST"]
 
         try:
-            op = "00" # Operacion de carga de recurso a frambuffer
             x = int(input(f"Ingrese la coordenada X donde se colocara el recurso en pantalla (0-{self.Screen_Resolution[0] - 1}): "))
             y = int(input(f"Ingrese la coordenada Y donde se colocara el recurso en pantalla (0-{self.Screen_Resolution[1] - 1}): "))
-            w = int(input("Ingrese el ancho del recurso (0-7 pixeles): "))
-            h = int(input("Ingrese el alto del recurso (0-7 pixeles): "))
-            dir_resource = int(input("Ingrese la posicion del recurso (en decimal):" )) * 64  # cada recurso ocupa 64 pixeles (8x8)
+            dir_resource = int(input("Ingrese la posicion del recurso (en decimal):" )) # cada recurso ocupa 64 pixeles (8x8)
         except ValueError:
             print("Error: Entrada invalida. Asegurese de ingresar numeros enteros.")
             return
 
         coordenadas_bin = converter.convert_int_to_bin(x, 8) + converter.convert_int_to_bin(y, 8)
-        dimension_bin = converter.convert_int_to_bin(w, 3) + converter.convert_int_to_bin(h, 3)
-        dir_bin = converter.convert_int_to_bin(dir_resource, 24)
-        print(converter.convert_bin_to_hex(dir_bin, 24))
-        raise NotImplementedError("Carga de recursos a GPU no implementada completamente.")
-        instruction_bin = LOAD + BUS + dir_bin + dimension_bin + coordenadas_bin + op
+        dir_bin = converter.convert_int_to_bin(dir_resource, 18)
+        fill = "0"*18
+        
+        instruction_bin = LOAD + BUS + fill + dir_bin + coordenadas_bin
         instruction_hex = converter.convert_bin_to_hex(instruction_bin, self.Len_Instruction)
         print(f"Instruccion para GPU: {instruction_hex}")
         self.write_in_ROM(instruction_hex)
