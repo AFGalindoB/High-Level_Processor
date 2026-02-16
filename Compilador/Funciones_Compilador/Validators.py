@@ -18,7 +18,7 @@ def check_input(prompt:str, type_input:any, error_msg:str, condicion="True"):
         prompt (str): Mensaje a mostrar al usuario.
         type_input (any): Tipo de dato esperado (e.g., int, float).
         error_msg (str): Mensaje de error en caso de entrada invalida.
-
+        condicion (str): Condicion adicional para validar la entrada (opcional).
     Returns:
         any: Entrada validada del tipo especificado.
     """

@@ -5,26 +5,34 @@ import Funciones_Compilador.Validators as validators
 
 class Compilador:
     def __init__(self):
-        self.Length_Data = 48  # bits
-        self.Len_Instruction = 56  # bits
+        self.Length_Data = 52  # bits
+        self.Len_Instruction = 60  # bits
         self.Screen_Resolution = (256, 256)  # pixels
+        self.alu_data_opernd_length = 24  # bits
         self.BUS_OPTIONS = {
-            "ALU_R": "000",
-            "R0":    "001", "R1":       "010", "R2":   "011", "R3": "100",
-            "CU":    "101", "VAR_CACHE":"110", "INPUT":"111"
+            "FPU":"0000", "ALU_SIMPLE":"0001", "ALU_COMPLEX":"0010",
+            "R0": "0011", "R1":        "0100", "R2":         "0101",
+            "R3": "0110", "IR":        "0111", "STACK":      "1000"
         }
         self.LOAD_OPTIONS = {
-            "NOP":            "00000", "ALU_X":          "00001", "ALU_Y":            "00010",
-            "R0":             "00011", "R1":             "00100", "R2":               "00101",
-            "R3":             "00110", "IF_WH_CONDITION":"00111", "IF_WH_ADR":        "01000", 
-            "CACHE_PC":       "01001", "PC":             "01010", "ALU_OP":           "01011",
-            "PC_JM_OP":       "01100", "GPU_INST":       "01101"
+            "NOP":        "0000", "ALU_SIMPLE": "0001", "ALU_COMPLEX":  "0010",
+            "R0":         "0011", "R1":         "0100", "R2":           "0101",
+            "R3":         "0110", "ADR_STACK":  "0111", "STACK":        "1000", 
+            "GPU_INST":   "1001", "PC_0":       "1010", "PC_1":         "1011",
+            "SWAP":       "1100", "LOAD_PAGE_N":"1101", "FPU_X":        "1110",
+            "FPU_Y_AND_OP":"1111"
         }
-        self.ALU_OP = {
-            "ADD":"0000", "SUB": "0001", "MUL":"0010", "DIV":"0011",
-            "AND":"0100", "NAND":"0101", "OR": "0110", "NOR":"0111",
-            "XOR":"1000", "XNOR":"1001", "GTR":"1010", "LSS":"1011",
-            "EQL":"1100"
+        self.ALU_SIMPLE = {
+            "ADD":"000", "SUB": "001", "AND":"010", "OR":"011", 
+            "XOR":"100", "NOT":"101",
+        }
+        self.ALU_COMPLEX = {
+            "MUL":"00", "DIV": "01", "MOD":"10"
+        }
+        self.FPU_OP = {
+            "FADD":        "000", "FSUB":        "001", 
+            "FMUL":        "010", "FDIV":        "011",
+            "FLOAT_TO_INT":"100", "INT_TO_FLOAT":"101"
         }
         
         self.root_path = os.path.dirname(os.path.abspath(__file__))
@@ -77,64 +85,55 @@ class Compilador:
         self.write_in_ROM(instruction_hex)
 
     def alu_operation(self):
-        BUS = self.BUS_OPTIONS["CU"]
-        LOAD1 = self.LOAD_OPTIONS["ALU_X"]
-        LOAD2 = self.LOAD_OPTIONS["ALU_Y"]
-        LOAD3 = self.LOAD_OPTIONS["ALU_OP"]
-
-        opciones = ["Enteros", "Decimales", "Logicos"]
-        tipo_de_dato = menu.select_option(opciones, "Seleccione el tipo de dato a operar:")
-
-        if tipo_de_dato == "Enteros":
-            while True:
-                try:
-                    max_value = (1 << self.Length_Data) - 1
-
-                    x_bin = int(input(f"Ingrese el valor entero de x (Min. 0, Max. {max_value}): "))
-                    y_bin = int(input(f"Ingrese el valor entero de y (Min. 0, Max. {max_value}): "))
-
-                    if not (0 <= x_bin <= max_value):
-                        raise ValueError(f"Error: x debe estar entre 0 y {max_value}.")
-                    if not (0 <= y_bin <= max_value):
-                        raise ValueError(f"Error: y debe estar entre 0 y {max_value}.")
-
-                    x_bin = converter.convert_int_to_bin(x_bin, self.Length_Data)
-                    y_bin = converter.convert_int_to_bin(y_bin, self.Length_Data)
-                    break
-                except ValueError as ve:
-                    print(ve)
-        elif tipo_de_dato == "Decimales":
-            raise NotImplementedError("Operacion con decimales no implementada.")
-        elif tipo_de_dato == "Logicos":
-            while True:
-                try:
-                    x_bin = validators.check_only_hexadecimal(input(f"Ingrese el valor logico de x (en hexadecimal) (Max. {self.Length_Data // 4} digitos): "))
-                    y_bin = validators.check_only_hexadecimal(input(f"Ingrese el valor logico de y (en hexadecimal) (Max. {self.Length_Data // 4} digitos): "))
-
-                    if len(x_bin) > self.Length_Data // 4 or len(y_bin) > self.Length_Data // 4:
-                        raise ValueError(f"Error: Los valores logicos no pueden exceder los {self.Length_Data} bits.")
-                    
-                    x_bin = converter.convert_hex_to_bin(x_bin, self.Length_Data)
-                    y_bin = converter.convert_hex_to_bin(y_bin, self.Length_Data)
-                    break
-                except ValueError as ve:
-                    print(ve)
-            
-        operacion = menu.select_option(list(self.ALU_OP.keys()), "Seleccione la operacion a realizar:")
-        alu_op_bin = self.ALU_OP[operacion].zfill(self.Length_Data)
-        print(f"{operacion} {x_bin} {y_bin}")
+        BUS = self.BUS_OPTIONS["IR"]
+        LOAD_OPTIONS = {
+            "ALU_SIMPLE": self.ALU_SIMPLE,
+            "ALU_COMPLEX": self.ALU_COMPLEX,
+            "FPU": self.FPU_OP
+        }
+        options = ["ALU_SIMPLE", "ALU_COMPLEX", "FPU"]
+        alu_type = menu.select_option(options, "Seleccione el tipo de ALU:")
         
-        instruction = converter.convert_bin_to_hex(LOAD1 + BUS + x_bin, self.Len_Instruction)
-        print(LOAD1 + BUS + x_bin, instruction, sep="\n")
-        self.write_in_ROM(instruction)
+        LOAD_GROUP = LOAD_OPTIONS[alu_type]
+        operation = menu.select_option(list(LOAD_GROUP.keys()), "Seleccione la operacion a realizar:")
         
-        instruction = converter.convert_bin_to_hex(LOAD2 + BUS + y_bin, self.Len_Instruction)
-        print(LOAD2 + BUS + y_bin, instruction, sep="\n")
-        self.write_in_ROM(instruction)
-        
-        instruction = converter.convert_bin_to_hex(LOAD3 + BUS + alu_op_bin, self.Len_Instruction)
-        print(LOAD3 + BUS + alu_op_bin, instruction, sep="\n")
-        self.write_in_ROM(instruction)
+        LOAD = self.LOAD_OPTIONS[LOAD_OPTIONS]
+        if operation in ("ADD", "SUB", "MUL", "DIV", "MOD"):
+            max_min_value = 2**(self.alu_data_opernd_length - 1)
+            x = validators.check_input(
+                f"Ingrese el primer operando (entre {-max_min_value} y {max_min_value - 1}): ",
+                int, f"Error: Entrada invalida. Ingrese un numero entero entre {-max_min_value} y {max_min_value - 1}.",
+                f"-{max_min_value} <= value < {max_min_value}"
+            )
+            y = validators.check_input(
+                f"Ingrese el segundo operando (entre {-max_min_value} y {max_min_value - 1}): ",
+                int, f"Error: Entrada invalida. Ingrese un numero entero entre {-max_min_value} y {max_min_value - 1}.",
+                f"-{max_min_value} <= value < {max_min_value}"
+            )
+            x_bin = converter.convert_int_to_bin(x, self.alu_data_opernd_length)
+            y_bin = converter.convert_int_to_bin(y, self.alu_data_opernd_length)
+            instruction_bin = LOAD + BUS + x_bin + y_bin + operation
+            instruction_hex = converter.convert_bin_to_hex(instruction_bin, self.Len_Instruction)
+            print(f"Instruccion para ALU: {instruction_hex}")
+            self.write_in_ROM(instruction_hex)
+        elif operation in ("AND", "OR", "XOR", "NOT"):
+            while True:    
+                x = validators.check_only_hexadecimal(input(f"Ingrese el operando x {self.alu_data_opernd_length // 4} digitos hexadecimales: "))
+                if len(x) > self.alu_data_opernd_length // 4:
+                    print(f"Error: El operando no puede exceder los {self.alu_data_opernd_length} bits."); continue
+                y = validators.check_only_hexadecimal(input(f"Ingrese el operando y {self.alu_data_opernd_length // 4} digitos hexadecimales: "))
+                if len(y) > self.alu_data_opernd_length // 4:
+                    print(f"Error: El operando no puede exceder los {self.alu_data_opernd_length} bits."); continue
+                break
+            x_bin = converter.convert_hex_to_bin(x, self.alu_data_opernd_length)
+            y_bin = converter.convert_hex_to_bin(y, self.alu_data_opernd_length)
+            instruction_bin = LOAD + BUS + x_bin + y_bin + operation
+            instruction_hex = converter.convert_bin_to_hex(instruction_bin, self.Len_Instruction)
+            print(f"Instruccion para ALU: {instruction_hex}")
+            self.write_in_ROM(instruction_hex)
+
+        else: # FPU operations
+            raise NotImplementedError("Operacion de FPU no implementada.")
     
     def get_option(self, options_type):
         """
